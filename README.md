@@ -42,70 +42,13 @@ The component automatically acknowledges purchases after a successful transactio
 
 ## Web setup
 
-Use the [purchasekit gem](https://github.com/purchasekit/purchasekit) to set up the web-side bridge component. It provides:
-
-- Rails helper to render a paywall
-- SDK to interact with the PurchaseKit dashboard
-- Automatic message handling with the native component
-- Optional Pay gem integration for automatic `Pay::Subscription` creation
-
-## Bridge component
-
-The `paywall` bridge component handles the following messages from the web:
-
-| Message | Description |
-|---------|-------------|
-| `prices` | Returns localized prices for requested product IDs |
-| `purchase` | Initiates Google Play purchase flow with `googleStoreProductId` and `correlationId` |
-
-### Prices
-
-Request:
-```json
-{ "products": [{ "googleStoreProductId": "monthly" }, { "googleStoreProductId": "yearly" }] }
-```
-
-Response:
-```json
-{
-  "prices": { "monthly": "$9.99", "yearly": "$99.99" }
-}
-```
-
-### Purchase
-
-Request:
-```json
-{ "googleStoreProductId": "monthly", "correlationId": "uuid" }
-```
-
-Response:
-```json
-{ "status": "success" }
-```
-
-Status values: `success`, `pending`, `cancelled`, `error`
+Use the [purchasekit gem](https://github.com/purchasekit/purchasekit) to add the paywall to your Rails app. The gem handles all communication with the native component automatically.
 
 ## Requirements
 
-- Android API 26+
+- Android API 28+
 - Kotlin 2.0+
 - Hotwire Native Android 1.2.0+
-
-## Testing
-
-### License testers
-
-Add test accounts in Play Console → Setup → License testing. License testers can make purchases without being charged.
-
-### Internal testing track
-
-For full end-to-end testing:
-
-1. Create an internal testing track in Play Console
-2. Upload your APK or AAB
-3. Add testers and share the opt-in link
-4. Testers install via the Play Store
 
 ## Releasing
 
