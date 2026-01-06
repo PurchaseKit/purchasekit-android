@@ -6,7 +6,6 @@ Android library for Google Play Billing integration with Hotwire Native.
 
 - `purchasekit/src/main/java/dev/purchasekit/android/PaywallComponent.kt` - Bridge component (thin routing layer)
 - `purchasekit/src/main/java/dev/purchasekit/android/BillingStore.kt` - Google Play Billing operations (prices, purchases)
-- `purchasekit/src/main/java/dev/purchasekit/android/Environment.kt` - Detects debug vs release environment
 - `purchasekit/src/main/java/dev/purchasekit/android/Version.kt` - Library version constant
 
 ## PaywallComponent
@@ -15,7 +14,7 @@ Hotwire Native bridge component that handles:
 
 | Message | Request | Response |
 |---------|---------|----------|
-| `prices` | Product IDs | Localized prices + environment |
+| `prices` | Product IDs | Localized prices |
 | `purchase` | Product ID + correlation UUID | Status (success/pending/cancelled/error) |
 
 ### Prices flow
@@ -23,7 +22,6 @@ Hotwire Native bridge component that handles:
 1. Web sends `prices` message with product IDs
 2. Component fetches from Google Play via `queryProductDetails`
 3. Returns localized `formattedPrice` for each product
-4. Includes `environment` (sandbox/production) for the web to pass to SaaS
 
 ### Purchase flow
 
@@ -34,14 +32,11 @@ Hotwire Native bridge component that handles:
 
 ## Environment detection
 
-`Environment.current(context)` returns `.Sandbox` or `.Production`:
+Unlike iOS, Android doesn't report environment from the client. Google Play doesn't have true sandbox/production separation - all purchases go through production infrastructure.
 
-| Build type | Environment |
-|------------|-------------|
-| Debug (debuggable flag set) | sandbox |
-| Release | production |
-
-**Note:** Unlike Apple's sandbox, Google Play doesn't have separate environments. The `testPurchase` flag only appears for license tester accounts configured in Play Console.
+The PurchaseKit server determines environment by checking Google's `testPurchase` flag when processing webhooks:
+- `testPurchase: true` → sandbox (license tester purchase)
+- `testPurchase: false` or absent → production
 
 ## BillingStore
 

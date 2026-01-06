@@ -68,12 +68,9 @@ Request:
 Response:
 ```json
 {
-  "prices": { "monthly": "$9.99", "yearly": "$99.99" },
-  "environment": "sandbox"
+  "prices": { "monthly": "$9.99", "yearly": "$99.99" }
 }
 ```
-
-Environment is `sandbox` (debug builds) or `production` (release builds).
 
 ### Purchase
 

@@ -52,10 +52,9 @@ class PaywallComponent(
             try {
                 Log.d(TAG, "Fetching prices for: $productIds")
                 val prices = billingStore.prices(productIds)
-                val environment = Environment.current(fragment.requireContext())
-                Log.d(TAG, "Prices fetched: $prices, environment=$environment")
+                Log.d(TAG, "Prices fetched: $prices")
 
-                val response = PricesResponse(prices = prices, environment = environment)
+                val response = PricesResponse(prices = prices)
                 Log.d(TAG, "Replying with: $response")
                 replyTo(message.event, response)
             } catch (e: Exception) {
@@ -151,7 +150,6 @@ internal data class PricesRequest(
 @Serializable
 internal data class PricesResponse(
     val prices: Map<String, String>? = null,
-    val environment: Environment? = null,
     val error: String? = null
 )
 
