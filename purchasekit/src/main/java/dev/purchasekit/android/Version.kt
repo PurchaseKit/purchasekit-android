@@ -1,3 +1,3 @@
 package dev.purchasekit.android
 
-const val PURCHASEKIT_VERSION = "0.1.0"
+const val PURCHASEKIT_VERSION = "0.3.3"
