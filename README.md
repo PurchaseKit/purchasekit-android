@@ -1,6 +1,6 @@
 # PurchaseKit Android
 
-Android library providing a Hotwire Native bridge component for Google Play Billing via [PurchaseKit](https://purchasekit.dev).
+Android library providing a Hotwire Native bridge component for Google Play Billing via [PurchaseKit](https://purchasekit.com).
 
 ## Installation
 
