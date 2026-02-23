@@ -16,6 +16,7 @@ Hotwire Native bridge component that handles:
 |---------|---------|----------|
 | `prices` | Product IDs | Localized prices |
 | `purchase` | Product ID + correlation UUID | Status (success/pending/cancelled/error) |
+| `restore` | (none) | List of active subscription IDs |
 
 ### Prices flow
 
@@ -29,6 +30,14 @@ Hotwire Native bridge component that handles:
 2. Component calls `launchBillingFlow` with `obfuscatedAccountId` set to UUID
 3. UUID links the purchase to the SaaS Purchase::Intent
 4. Returns status to web (success keeps spinner, cancelled re-enables form)
+
+### Restore flow
+
+1. Web sends `restore` message (no request data)
+2. Component calls `billingStore.currentSubscriptionIds()` which queries `SUBS` purchases
+3. Filters to `PURCHASED` state and returns order IDs (with renewal suffix stripped)
+4. Web dispatches `purchasekit--paywall:restore` DOM event with the IDs
+5. Developer matches IDs against stored subscriptions (IDs match `subscription_id` from webhook payloads)
 
 ## Environment detection
 
@@ -46,6 +55,7 @@ Singleton that manages Google Play Billing connection and operations:
 - `prices(productIds)` - Fetches localized prices for subscription products
 - `purchase(activity, productId, correlationId)` - Launches purchase flow
 - `acknowledgePurchase(purchase)` - Acknowledges successful purchase
+- `currentSubscriptionIds()` - Returns order IDs of active subscriptions (for restore)
 
 ## Google Play Billing notes
 
@@ -117,6 +127,10 @@ class MyApplication : Application() {
 ```
 
 ## Testing
+
+### Emulator limitations
+
+Google Play Billing requires being signed into a Google account on the device. Emulators can fetch prices if signed in, but **subscription purchases require a physical device**. The Google Play purchase flow does not complete reliably on emulators, even with a signed-in account and license tester configured.
 
 ### License testers
 

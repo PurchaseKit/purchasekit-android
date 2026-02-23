@@ -13,8 +13,10 @@ import com.android.billingclient.api.PendingPurchasesParams
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.QueryProductDetailsParams
+import com.android.billingclient.api.QueryPurchasesParams
 import com.android.billingclient.api.acknowledgePurchase
 import com.android.billingclient.api.queryProductDetails
+import com.android.billingclient.api.queryPurchasesAsync
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
@@ -289,6 +291,37 @@ class BillingStore private constructor(context: Context) {
                 continuation.resume(PurchaseResult.Error(errorMsg))
             }
         }
+    }
+
+    suspend fun currentSubscriptionIds(): List<String> {
+        Log.d(TAG, "currentSubscriptionIds() called")
+
+        if (!connect()) {
+            throw Exception("Failed to connect to Google Play")
+        }
+
+        val client = billingClient ?: throw Exception("Billing client not available")
+
+        val params = QueryPurchasesParams.newBuilder()
+            .setProductType(BillingClient.ProductType.SUBS)
+            .build()
+
+        val result = client.queryPurchasesAsync(params)
+
+        Log.d(TAG, "queryPurchasesAsync result: responseCode=${result.billingResult.responseCode}, " +
+                "purchaseCount=${result.purchasesList.size}")
+
+        if (result.billingResult.responseCode != BillingResponseCode.OK) {
+            throw Exception("Failed to query purchases: ${result.billingResult.debugMessage}")
+        }
+
+        val ids = result.purchasesList
+            .filter { it.purchaseState == Purchase.PurchaseState.PURCHASED }
+            .mapNotNull { it.orderId }
+            .map { it.replace(Regex("\\.\\.\\d+$"), "") }
+
+        Log.d(TAG, "currentSubscriptionIds() returning: $ids")
+        return ids
     }
 
     suspend fun acknowledgePurchase(purchase: Purchase) {

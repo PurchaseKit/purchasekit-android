@@ -26,6 +26,7 @@ class PaywallComponent(
         when (message.event) {
             "prices" -> handlePrices(message)
             "purchase" -> handlePurchase(message)
+            "restore" -> handleRestore(message)
             else -> Log.w(TAG, "Unknown event for message: $message")
         }
     }
@@ -129,6 +130,19 @@ class PaywallComponent(
         }
     }
 
+    private fun handleRestore(message: Message) {
+        fragment.lifecycleScope.launch {
+            try {
+                val ids = billingStore.currentSubscriptionIds()
+                Log.d(TAG, "Restore subscription IDs: $ids")
+                replyTo(message.event, RestoreResponse(subscriptionIds = ids))
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to restore purchases", e)
+                replyTo(message.event, RestoreResponse(subscriptionIds = emptyList(), error = e.message))
+            }
+        }
+    }
+
     companion object {
         private const val TAG = "PaywallComponent"
     }
@@ -158,6 +172,12 @@ internal data class PurchaseRequest(
     @SerialName("googleStoreProductId")
     val googleStoreProductId: String?,
     val correlationId: String
+)
+
+@Serializable
+internal data class RestoreResponse(
+    val subscriptionIds: List<String>,
+    val error: String? = null
 )
 
 @Serializable
