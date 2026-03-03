@@ -40,10 +40,14 @@ class PaywallComponent(
             return
         }
 
-        val productIds = data.products.mapNotNull { it.googleStoreProductId }
-        Log.d(TAG, "handlePrices: productIds=$productIds")
+        val queries = data.products.mapNotNull { product ->
+            product.googleStoreProductId?.let { productId ->
+                ProductQuery(productId = productId, basePlanId = product.googleStoreBasePlanId)
+            }
+        }
+        Log.d(TAG, "handlePrices: queries=$queries")
 
-        if (productIds.isEmpty()) {
+        if (queries.isEmpty()) {
             Log.w(TAG, "No Google product IDs found in request")
             replyTo(message.event, PricesResponse(error = "No Google product IDs"))
             return
@@ -51,15 +55,15 @@ class PaywallComponent(
 
         fragment.lifecycleScope.launch {
             try {
-                Log.d(TAG, "Fetching prices for: $productIds")
-                val prices = billingStore.prices(productIds)
+                Log.d(TAG, "Fetching prices for: $queries")
+                val prices = billingStore.prices(queries)
                 Log.d(TAG, "Prices fetched: $prices")
 
                 val response = PricesResponse(prices = prices)
                 Log.d(TAG, "Replying with: $response")
                 replyTo(message.event, response)
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to load prices for $productIds", e)
+                Log.e(TAG, "Failed to load prices for $queries", e)
                 replyTo(message.event, PricesResponse(error = e.message))
             }
         }
@@ -81,13 +85,14 @@ class PaywallComponent(
             return
         }
 
-        Log.d(TAG, "Starting purchase: productId=$productId, correlationId=${data.correlationId}")
+        Log.d(TAG, "Starting purchase: productId=$productId, basePlanId=${data.googleStoreBasePlanId}, correlationId=${data.correlationId}")
 
         fragment.lifecycleScope.launch {
             try {
                 val result = billingStore.purchase(
                     activity = fragment.requireActivity(),
                     productId = productId,
+                    basePlanId = data.googleStoreBasePlanId,
                     correlationId = data.correlationId
                 )
 
@@ -157,7 +162,9 @@ internal data class PricesRequest(
     @Serializable
     data class Product(
         @SerialName("googleStoreProductId")
-        val googleStoreProductId: String?
+        val googleStoreProductId: String?,
+        @SerialName("googleStoreBasePlanId")
+        val googleStoreBasePlanId: String? = null
     )
 }
 
@@ -171,6 +178,8 @@ internal data class PricesResponse(
 internal data class PurchaseRequest(
     @SerialName("googleStoreProductId")
     val googleStoreProductId: String?,
+    @SerialName("googleStoreBasePlanId")
+    val googleStoreBasePlanId: String? = null,
     val correlationId: String
 )
 

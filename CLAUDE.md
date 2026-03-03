@@ -14,8 +14,8 @@ Hotwire Native bridge component that handles:
 
 | Message | Request | Response |
 |---------|---------|----------|
-| `prices` | Product IDs | Localized prices |
-| `purchase` | Product ID + correlation UUID | Status (success/pending/cancelled/error) |
+| `prices` | Product IDs + optional base plan IDs | Localized prices |
+| `purchase` | Product ID + optional base plan ID + correlation UUID | Status (success/pending/cancelled/error) |
 | `restore` | (none) | List of active subscription IDs |
 
 ### Prices flow
@@ -52,8 +52,8 @@ The PurchaseKit server determines environment by checking Google's `testPurchase
 Singleton that manages Google Play Billing connection and operations:
 
 - `connect()` - Establishes connection to Google Play
-- `prices(productIds)` - Fetches localized prices for subscription products
-- `purchase(activity, productId, correlationId)` - Launches purchase flow
+- `prices(queries)` - Fetches localized prices for subscription products (accepts `List<ProductQuery>` with optional `basePlanId`)
+- `purchase(activity, productId, basePlanId, correlationId)` - Launches purchase flow (basePlanId is optional)
 - `acknowledgePurchase(purchase)` - Acknowledges successful purchase
 - `currentSubscriptionIds()` - Returns order IDs of active subscriptions (for restore)
 

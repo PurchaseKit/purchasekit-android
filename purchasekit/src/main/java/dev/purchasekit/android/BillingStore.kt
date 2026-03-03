@@ -123,8 +123,8 @@ class BillingStore private constructor(context: Context) {
         }
     }
 
-    suspend fun prices(productIds: List<String>): Map<String, String> {
-        Log.d(TAG, "prices() called for: $productIds")
+    suspend fun prices(queries: List<ProductQuery>): Map<String, String> {
+        Log.d(TAG, "prices() called for: $queries")
 
         if (!connect()) {
             Log.e(TAG, "Failed to connect for prices query")
@@ -133,7 +133,9 @@ class BillingStore private constructor(context: Context) {
 
         val client = billingClient ?: throw BillingException("BillingClient is null")
 
-        val productList = productIds.map { productId ->
+        // Deduplicate product IDs for the Google Play query
+        val uniqueProductIds = queries.map { it.productId }.distinct()
+        val productList = uniqueProductIds.map { productId ->
             QueryProductDetailsParams.Product.newBuilder()
                 .setProductId(productId)
                 .setProductType(BillingClient.ProductType.SUBS)
@@ -162,7 +164,12 @@ class BillingStore private constructor(context: Context) {
         val productDetails = result.productDetailsList ?: emptyList()
         val prices = mutableMapOf<String, String>()
 
-        for (product in productDetails) {
+        // Build a lookup from productId to product details
+        val detailsByProductId = productDetails.associateBy { it.productId }
+
+        for (query in queries) {
+            val product = detailsByProductId[query.productId] ?: continue
+
             Log.d(TAG, "Product: ${product.productId}, " +
                     "title=${product.title}, " +
                     "offerCount=${product.subscriptionOfferDetails?.size ?: 0}")
@@ -174,23 +181,27 @@ class BillingStore private constructor(context: Context) {
                         "pricingPhases=${offer.pricingPhases.pricingPhaseList.map { it.formattedPrice }}")
             }
 
-            val price = product.subscriptionOfferDetails
-                ?.firstOrNull()
-                ?.pricingPhases
-                ?.pricingPhaseList
-                ?.firstOrNull()
-                ?.formattedPrice
+            // Match by basePlanId when provided, fall back to first offer
+            val offer = if (query.basePlanId != null) {
+                product.subscriptionOfferDetails?.firstOrNull { it.basePlanId == query.basePlanId }
+            } else {
+                product.subscriptionOfferDetails?.firstOrNull()
+            }
+
+            val price = offer?.pricingPhases?.pricingPhaseList?.firstOrNull()?.formattedPrice
 
             if (price != null) {
-                prices[product.productId] = price
-                Log.d(TAG, "Price for ${product.productId}: $price")
+                // Key by basePlanId when present, productId when not
+                val key = query.basePlanId ?: product.productId
+                prices[key] = price
+                Log.d(TAG, "Price for ${key}: $price")
             }
         }
 
-        val foundIds = prices.keys
-        val missingIds = productIds.filter { it !in foundIds }
-        if (missingIds.isNotEmpty()) {
-            Log.w(TAG, "Products not found: $missingIds")
+        val foundKeys = prices.keys
+        val missingQueries = queries.filter { (it.basePlanId ?: it.productId) !in foundKeys }
+        if (missingQueries.isNotEmpty()) {
+            Log.w(TAG, "Products not found: $missingQueries")
         }
 
         Log.d(TAG, "prices() returning: $prices")
@@ -200,9 +211,10 @@ class BillingStore private constructor(context: Context) {
     suspend fun purchase(
         activity: Activity,
         productId: String,
+        basePlanId: String? = null,
         correlationId: String
     ): PurchaseResult {
-        Log.d(TAG, "purchase() called: productId=$productId, correlationId=$correlationId")
+        Log.d(TAG, "purchase() called: productId=$productId, basePlanId=$basePlanId, correlationId=$correlationId")
 
         if (!connect()) {
             Log.e(TAG, "Failed to connect for purchase")
@@ -238,9 +250,13 @@ class BillingStore private constructor(context: Context) {
         Log.d(TAG, "Found product: ${productDetails.productId}, " +
                 "offerCount=${productDetails.subscriptionOfferDetails?.size ?: 0}")
 
-        val offerDetails = productDetails.subscriptionOfferDetails?.firstOrNull()
+        val offerDetails = if (basePlanId != null) {
+            productDetails.subscriptionOfferDetails?.firstOrNull { it.basePlanId == basePlanId }
+        } else {
+            productDetails.subscriptionOfferDetails?.firstOrNull()
+        }
         if (offerDetails == null) {
-            Log.e(TAG, "No offer found for product: $productId")
+            Log.e(TAG, "No offer found for product: $productId (basePlanId=$basePlanId)")
             return PurchaseResult.Error("No offer found for product: $productId")
         }
 
@@ -371,5 +387,10 @@ sealed class PurchaseResult {
     data object Pending : PurchaseResult()
     data class Error(val message: String) : PurchaseResult()
 }
+
+data class ProductQuery(
+    val productId: String,
+    val basePlanId: String? = null
+)
 
 class BillingException(message: String) : Exception(message)
