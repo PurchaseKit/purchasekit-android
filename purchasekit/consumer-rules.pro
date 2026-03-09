@@ -6,6 +6,6 @@
 -keepclassmembers class kotlinx.serialization.json.** {
     *** Companion;
 }
--keepclassnames class kotlinx.serialization.internal.** {
+-keepnames class kotlinx.serialization.internal.** {
     *;
 }
