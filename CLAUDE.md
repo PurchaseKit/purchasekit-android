@@ -15,7 +15,7 @@ Hotwire Native bridge component that handles:
 | Message | Request | Response |
 |---------|---------|----------|
 | `prices` | Product IDs + optional base plan IDs | Localized prices |
-| `purchase` | Product ID + optional base plan ID + correlation UUID | Status (success/pending/cancelled/error) |
+| `purchase` | Product ID + optional base plan ID + correlation UUID + optional proration mode | Status (success/pending/cancelled/error) |
 | `restore` | (none) | List of active subscription IDs |
 
 ### Prices flow
@@ -30,6 +30,15 @@ Hotwire Native bridge component that handles:
 2. Component calls `launchBillingFlow` with `obfuscatedAccountId` set to UUID
 3. UUID links the purchase to the SaaS Purchase::Intent
 4. Returns status to web (success keeps spinner, cancelled re-enables form)
+
+### Plan upgrades and downgrades
+
+Switching base plans within one umbrella subscription (for example monthly to annual on the same product) requires the Google purchase token of the existing subscription. The purchase flow looks it up via `queryPurchasesAsync` and attaches `SubscriptionUpdateParams` with a replacement mode. Apple handles intra-group swaps for free, so this is Android only.
+
+- Replacement mode defaults to `CHARGE_PRORATED_PRICE`, the closest match to Apple's "refund unused time".
+- Override it with the `proration_mode` paywall option in the gem. Accepted values: `charge_prorated_price`, `with_time_proration`, `charge_full_price`, `without_proration`, `deferred`.
+- Buying a different product the user does not own (for example Vendor to Employer) starts a new subscription with no token attached.
+- If Google still reports `ITEM_ALREADY_OWNED`, the component returns an error instead of a false success, so a blocked swap no longer looks like it worked.
 
 ### Restore flow
 
@@ -53,7 +62,7 @@ Singleton that manages Google Play Billing connection and operations:
 
 - `connect()` - Establishes connection to Google Play
 - `prices(queries)` - Fetches localized prices for subscription products (accepts `List<ProductQuery>` with optional `basePlanId`)
-- `purchase(activity, productId, basePlanId, correlationId)` - Launches purchase flow (basePlanId is optional)
+- `purchase(activity, productId, basePlanId, correlationId, prorationMode)` - Launches purchase flow. When the user already owns the product, attaches `SubscriptionUpdateParams` so the base plan is swapped instead of failing. `basePlanId` and `prorationMode` are optional
 - `acknowledgePurchase(purchase)` - Acknowledges successful purchase
 - `currentSubscriptionIds()` - Returns order IDs of active subscriptions (for restore)
 

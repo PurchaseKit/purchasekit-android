@@ -8,6 +8,7 @@ import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClient.BillingResponseCode
 import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingFlowParams
+import com.android.billingclient.api.BillingFlowParams.SubscriptionUpdateParams
 import com.android.billingclient.api.BillingResult
 import com.android.billingclient.api.PendingPurchasesParams
 import com.android.billingclient.api.Purchase
@@ -212,9 +213,11 @@ class BillingStore private constructor(context: Context) {
         activity: Activity,
         productId: String,
         basePlanId: String? = null,
-        correlationId: String
+        correlationId: String,
+        prorationMode: String? = null
     ): PurchaseResult {
-        Log.d(TAG, "purchase() called: productId=$productId, basePlanId=$basePlanId, correlationId=$correlationId")
+        Log.d(TAG, "purchase() called: productId=$productId, basePlanId=$basePlanId, " +
+                "correlationId=$correlationId, prorationMode=$prorationMode")
 
         if (!connect()) {
             Log.e(TAG, "Failed to connect for purchase")
@@ -271,10 +274,29 @@ class BillingStore private constructor(context: Context) {
             .setOfferToken(offerToken)
             .build()
 
-        val billingFlowParams = BillingFlowParams.newBuilder()
+        val billingFlowParamsBuilder = BillingFlowParams.newBuilder()
             .setProductDetailsParamsList(listOf(productDetailsParams))
             .setObfuscatedAccountId(correlationId)
-            .build()
+
+        // When the user already owns this product (e.g. switching the monthly base
+        // plan to annual within one umbrella subscription), Google requires the
+        // existing purchase token so it can replace the plan instead of rejecting
+        // the buy with ITEM_ALREADY_OWNED. Apple does intra-group swaps for free.
+        val existingToken = activeSubscriptionToken(client, productId)
+        if (existingToken != null) {
+            val replacementMode = replacementModeFor(prorationMode)
+            Log.d(TAG, "Existing subscription found for $productId, attaching " +
+                    "SubscriptionUpdateParams (replacementMode=$replacementMode, " +
+                    "oldToken=${existingToken.take(20)}...)")
+            billingFlowParamsBuilder.setSubscriptionUpdateParams(
+                SubscriptionUpdateParams.newBuilder()
+                    .setOldPurchaseToken(existingToken)
+                    .setSubscriptionReplacementMode(replacementMode)
+                    .build()
+            )
+        }
+
+        val billingFlowParams = billingFlowParamsBuilder.build()
 
         Log.d(TAG, "Launching billing flow...")
 
@@ -306,6 +328,41 @@ class BillingStore private constructor(context: Context) {
                 Log.e(TAG, "Failed to launch billing flow: $errorMsg")
                 continuation.resume(PurchaseResult.Error(errorMsg))
             }
+        }
+    }
+
+    // Returns the purchase token of an active subscription for [productId], or null
+    // if the user does not currently own it. Used to drive plan upgrades/downgrades.
+    private suspend fun activeSubscriptionToken(client: BillingClient, productId: String): String? {
+        val params = QueryPurchasesParams.newBuilder()
+            .setProductType(BillingClient.ProductType.SUBS)
+            .build()
+
+        val result = client.queryPurchasesAsync(params)
+
+        if (result.billingResult.responseCode != BillingResponseCode.OK) {
+            Log.w(TAG, "Could not query existing purchases for upgrade: " +
+                    "${result.billingResult.debugMessage}")
+            return null
+        }
+
+        return result.purchasesList
+            .firstOrNull {
+                it.purchaseState == Purchase.PurchaseState.PURCHASED &&
+                    it.products.contains(productId)
+            }
+            ?.purchaseToken
+    }
+
+    // Maps a paywall proration option to a Google Play replacement mode. Defaults to
+    // CHARGE_PRORATED_PRICE, the closest match to Apple's "refund unused time".
+    private fun replacementModeFor(prorationMode: String?): Int {
+        return when (prorationMode?.lowercase()) {
+            "with_time_proration" -> SubscriptionUpdateParams.ReplacementMode.WITH_TIME_PRORATION
+            "charge_full_price" -> SubscriptionUpdateParams.ReplacementMode.CHARGE_FULL_PRICE
+            "without_proration" -> SubscriptionUpdateParams.ReplacementMode.WITHOUT_PRORATION
+            "deferred" -> SubscriptionUpdateParams.ReplacementMode.DEFERRED
+            else -> SubscriptionUpdateParams.ReplacementMode.CHARGE_PRORATED_PRICE
         }
     }
 

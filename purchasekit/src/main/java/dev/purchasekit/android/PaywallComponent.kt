@@ -93,7 +93,8 @@ class PaywallComponent(
                     activity = fragment.requireActivity(),
                     productId = productId,
                     basePlanId = data.googleStoreBasePlanId,
-                    correlationId = data.correlationId
+                    correlationId = data.correlationId,
+                    prorationMode = data.googleStoreProrationMode
                 )
 
                 Log.d(TAG, "Purchase result: $result")
@@ -116,8 +117,14 @@ class PaywallComponent(
                     }
 
                     is PurchaseResult.AlreadyOwned -> {
-                        Log.d(TAG, "Item already owned, treating as success")
-                        PurchaseResponse(status = PurchaseStatus.Success)
+                        // The buy was rejected because the user already owns this
+                        // product and nothing changed. A blocked plan swap lands here,
+                        // so surface it as an error rather than a false success.
+                        Log.w(TAG, "Item already owned, purchase did not change anything")
+                        PurchaseResponse(
+                            status = PurchaseStatus.Error,
+                            error = "You already own this subscription."
+                        )
                     }
 
                     is PurchaseResult.Error -> {
@@ -180,6 +187,8 @@ internal data class PurchaseRequest(
     val googleStoreProductId: String?,
     @SerialName("googleStoreBasePlanId")
     val googleStoreBasePlanId: String? = null,
+    @SerialName("googleStoreProrationMode")
+    val googleStoreProrationMode: String? = null,
     val correlationId: String
 )
 
