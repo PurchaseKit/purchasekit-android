@@ -68,7 +68,7 @@ Singleton that manages Google Play Billing connection and operations:
 
 ## Google Play Billing notes
 
-- Uses Google Play Billing Library 7.x
+- Uses Google Play Billing Library 8.x
 - Requires `com.android.vending.BILLING` permission (added in manifest)
 - `obfuscatedAccountId` is used for correlation (similar to Apple's `appAccountToken`)
 - Purchases must be acknowledged within 3 days or they're automatically refunded
@@ -94,7 +94,7 @@ Add the dependency to your app's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.purchasekit:purchasekit-android:0.1.0")
+    implementation("com.github.purchasekit:purchasekit-android:0.9.0")
 }
 ```
 
