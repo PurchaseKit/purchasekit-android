@@ -59,7 +59,7 @@ publishing {
         register<MavenPublication>("release") {
             groupId = "dev.purchasekit"
             artifactId = "purchasekit"
-            version = "0.6.0"
+            version = "0.9.0"
 
             afterEvaluate {
                 from(components["release"])
